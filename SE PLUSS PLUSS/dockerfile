@@ -1,0 +1,15 @@
+# Stage 1: Build
+FROM gcc:latest as builder
+RUN apt-get update && apt-get install -y cmake
+WORKDIR /usr/src/app
+COPY . .
+RUN mkdir build && cd build && cmake .. && make
+
+# Stage 2: Run
+FROM debian:bookworm-slim
+# Install runtime dependencies if needed (e.g., libstdc++)
+RUN apt-get update && apt-get install -y libstdc++6 && rm -rf /var/lib/apt/lists/*
+WORKDIR /root/
+COPY --from=builder /usr/src/app/build/my_cpp_app .
+EXPOSE 8080
+CMD ["./my_cpp_app"]
