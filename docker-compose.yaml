@@ -1,8 +1,8 @@
 services:
   frontend:
-    build: ./SE PLUSS PLUSS
+    build: ./cpp
     ports:
-      - "80:80"
+      - "8080:80"
     depends_on:
       - backend
     networks:
@@ -11,9 +11,9 @@ services:
   backend:
     build: ./vue
     ports:
-      - "8080:8080"
+      - "80:80"
     environment:
-      - PORT=8080
+      - PORT=80
     networks:
       - app-network
 

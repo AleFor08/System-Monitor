@@ -1,0 +1,5 @@
+* text=auto
+
+# Force LF for Dockerfiles
+**/Dockerfile text eol=lf
+**/dockerfile text eol=lf
