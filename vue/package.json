@@ -1,0 +1,14 @@
+{
+  "name": "dybde-4",
+  "version": "1.0.0",
+  "description": "School project using Vue",
+  "license": "ISC",
+  "author": "Kentia",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
