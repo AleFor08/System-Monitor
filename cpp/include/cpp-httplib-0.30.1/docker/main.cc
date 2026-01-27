@@ -242,6 +242,18 @@ bool setup_server(Server &svr, const ServerConfig &config) {
   svr.set_file_extension_and_mimetype_mapping("zip", "application/zip");
   svr.set_file_extension_and_mimetype_mapping("txt", "text/plain");
 
+  // Add a simple metrics endpoint with CORS support for the frontend
+  svr.Options("/metrics", [](const Request&, Response &res) {
+    res.set_header("Access-Control-Allow-Origin", "*");
+    res.set_header("Access-Control-Allow-Methods", "GET, OPTIONS");
+    res.set_header("Access-Control-Allow-Headers", "Content-Type");
+    res.status = 204;
+  });
+
+  svr.Get("/metrics", [](const Request&, Response &res) {
+    res.set_header("Access-Control-Allow-Origin", "*");
+    res.set_content("{\"cpu\":55,\"ram\":73}", "application/json");
+  });
   svr.set_error_handler([](const Request & /*req*/, Response &res) {
     if (res.status == 404) {
       res.set_content(
