@@ -1,19 +1,17 @@
 services:
   frontend:
-    build: ./cpp
+    build: ./vue
     ports:
-      - "8080:80"
+      - "80:80"
     depends_on:
       - backend
     networks:
       - app-network
 
   backend:
-    build: ./vue
+    build: ./cpp
     ports:
-      - "80:80"
-    environment:
-      - PORT=80
+      - "8080:80"
     networks:
       - app-network
 

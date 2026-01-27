@@ -4,14 +4,20 @@
   "description": "School project using Vue",
   "license": "ISC",
   "author": "Kentia",
-  "type": "commonjs",
+  "type": "module",
   "main": "index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "vite build",
     "start": "node dist/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
     "vue": "^3.5.27"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0",
+    "@vitejs/plugin-vue": "^5.0.0",
+    "typescript": "^5.0.0",
+    "vue-tsc": "^1.8.0"
   }
 }
