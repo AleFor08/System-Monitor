@@ -7,23 +7,31 @@
         status: 0
     })
 
+    const error = ref('')
 
     onMounted(async () => {
-    try {
-        const res = await fetch('http://localhost:8080/metrics')
-        const data = await res.json()
-        metrics.value = data
-    } catch (err) {
-        console.error('Failed to fetch metrics:', err)
-    }
+        try {
+            const res = await fetch('http://backend:8080/metrics')
+            const data = await res.json()
+            metrics.value = data
+        } catch (err) {
+            error.value = 'Kunne ikke hente metrics: ' + err
+        }
     })
 </script>
 
 <template>
     <main>
-        <h1>System Metrics</h1>
-        <p>CPU: {{ metrics.cpu }}%</p>
-        <p>RAM: {{ metrics.ram }}%</p>
+        <h1>System Metrikis</h1>
+        <div v-if="error" style="color: red;">
+            {{ error }}
+        </div>
+        <div v-else>
+            <p>CPU: {{ metrics.cpu }}%</p>
+            <p>RAM: {{ metrics.ram }}%</p>
+            
+        </div>
+        <button class="btn btn-primary">Dette er en Bootstrap-knapp!</button>
     </main>
 </template>
 
