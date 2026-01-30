@@ -22,7 +22,7 @@
 
 <template>
     <main>
-        <h1>System Metrics</h1>
+        <h1>System Metricss</h1>
         <div v-if="error" style="color: red;">
             {{ error }}
         </div>
@@ -31,7 +31,6 @@
             <p>RAM: {{ metrics.ram }}%</p>
             
         </div>
-        <button class="btn btn-primary">Dette er en Bootstrap-knapp!</button>
     </main>
 </template>
 
