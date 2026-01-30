@@ -5,11 +5,6 @@
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "skipLibCheck": true,
-<<<<<<< HEAD
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-=======
->>>>>>> vue
 
     /* Bundler mode */
     "moduleResolution": "bundler",
@@ -17,11 +12,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-<<<<<<< HEAD
-    "jsx": "preserve"
-=======
     "jsx": "react-jsx"
->>>>>>> vue
   },
   "include": ["src"],
   "references": [{ "path": "./tsconfig.node.json" }]
