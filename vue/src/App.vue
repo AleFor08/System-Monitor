@@ -11,7 +11,7 @@
 
     onMounted(async () => {
         try {
-            const res = await fetch('http://backend:8080/metrics')
+            const res = await fetch('http://localhost:8080/metrics')
             const data = await res.json()
             metrics.value = data
         } catch (err) {
@@ -22,7 +22,7 @@
 
 <template>
     <main>
-        <h1>System Metrikis</h1>
+        <h1>System Metrics</h1>
         <div v-if="error" style="color: red;">
             {{ error }}
         </div>
