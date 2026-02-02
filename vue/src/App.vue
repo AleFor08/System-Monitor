@@ -29,8 +29,8 @@
         <div v-else>
             <p>CPU: {{ metrics.cpu }}%</p>
             <p>RAM: {{ metrics.ram }}%</p>
-            
         </div>
+        <button class="btn btn-primary">Dette er en Bootstrap-knapp!</button>
     </main>
 </template>
 
