@@ -15,13 +15,166 @@
 #include <sstream>
 
 #include <httplib.h>
+#include <nlohmann/json.hpp>
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#else
+#include <sys/sysinfo.h>
+#include <unistd.h>
+#include <fstream>
+#endif
+#include <thread> 
+
+
+#ifdef _WIN32
+#include <psapi.h>
+#include <TCHAR.h>
+#include <pdh.h>
+
+
+static PDH_HQUERY cpuQuery;
+static PDH_HCOUNTER cpuTotal;
+
+static ULARGE_INTEGER lastCPU, lastSysCPU, lastUserCPU;
+static int numProcessors;
+static HANDLE self;
+
+double getCPUValue();
+double getCurrentCPUValue();
+double getVirtualRam();
+double getUsedVirtualRam();
+double getVirtualRamProcess();
+double getPhysicalRam();
+double getUsedPhysicalRam();
+double getPhysicalRamProcess();
+
+
+
+void init(){
+    PdhOpenQuery(NULL, NULL, &cpuQuery);
+    // You can also use L"\\Processor(*)\\% Processor Time" and get individual CPU values with PdhGetFormattedCounterArray()
+    PdhAddEnglishCounter(cpuQuery, L"\\Processor(_Total)\\% Processor Time", NULL, &cpuTotal);
+    PdhCollectQueryData(cpuQuery);
+
+    SYSTEM_INFO sysInfo;
+    FILETIME ftime, fsys, fuser;
+
+    GetSystemInfo(&sysInfo);
+    numProcessors = sysInfo.dwNumberOfProcessors;
+
+    GetSystemTimeAsFileTime(&ftime);
+    memcpy(&lastCPU, &ftime, sizeof(FILETIME));
+
+    self = GetCurrentProcess();
+    GetProcessTimes(self, &ftime, &ftime, &fsys, &fuser);
+    memcpy(&lastSysCPU, &fsys, sizeof(FILETIME));
+    memcpy(&lastUserCPU, &fuser, sizeof(FILETIME));
+}
+
+double getCPUValue(){
+    PDH_FMT_COUNTERVALUE counterVal;
+
+    PdhCollectQueryData(cpuQuery);
+    PdhGetFormattedCounterValue(cpuTotal, PDH_FMT_DOUBLE, NULL, &counterVal);
+    return counterVal.doubleValue;
+}
+
+double getCurrentCPUValue(){
+    FILETIME ftime, fsys, fuser;
+    ULARGE_INTEGER now, sys, user;
+    double percent;
+
+    GetSystemTimeAsFileTime(&ftime);
+    memcpy(&now, &ftime, sizeof(FILETIME));
+
+    GetProcessTimes(self, &ftime, &ftime, &fsys, &fuser);
+    memcpy(&sys, &fsys, sizeof(FILETIME));
+    memcpy(&user, &fuser, sizeof(FILETIME));
+    percent = (sys.QuadPart - lastSysCPU.QuadPart) +
+        (user.QuadPart - lastUserCPU.QuadPart);
+    percent /= (now.QuadPart - lastCPU.QuadPart);
+    percent /= numProcessors;
+    lastCPU = now;
+    lastUserCPU = user;
+    lastSysCPU = sys;
+
+    return percent * 100;
+}
+
+
+double getVirtualRam(){
+  // Total virtual memory
+  MEMORYSTATUSEX memInfo;
+  memInfo.dwLength = sizeof(MEMORYSTATUSEX);
+  GlobalMemoryStatusEx(&memInfo);
+  DWORDLONG totalVirtualMem = memInfo.ullTotalPageFile;
+
+  return (double)totalVirtualMem;
+}
+
+double getUsedVirtualRam(){
+  // Used virtual memory
+  MEMORYSTATUSEX memInfo;
+  memInfo.dwLength = sizeof(MEMORYSTATUSEX);
+  GlobalMemoryStatusEx(&memInfo);
+  DWORDLONG virtualMemUsed = memInfo.ullTotalPageFile - memInfo.ullAvailPageFile; 
+
+  return (double)virtualMemUsed;
+}
+
+double getVirtualRamProcess(){
+  // Process memory
+  PROCESS_MEMORY_COUNTERS_EX pmc;
+  GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc));
+  SIZE_T virtualMemUsedProcess = pmc.PrivateUsage;
+
+  return (double)virtualMemUsedProcess;
+}
+
+
+double getPhysicalRam(){
+  // Total physical memory
+  MEMORYSTATUSEX memInfo;
+  memInfo.dwLength = sizeof(MEMORYSTATUSEX);
+  GlobalMemoryStatusEx(&memInfo);
+  DWORDLONG totalPhysMem = memInfo.ullTotalPhys;
+
+  return (double)totalPhysMem;
+}
+
+double getUsedPhysicalRam(){
+  // Total physical memory used
+  MEMORYSTATUSEX memInfo;
+  memInfo.dwLength = sizeof(MEMORYSTATUSEX);
+  GlobalMemoryStatusEx(&memInfo);
+  DWORDLONG physMemUsed = memInfo.ullTotalPhys - memInfo.ullAvailPhys;
+
+  return (double)physMemUsed;
+}
+
+double getPhysicalRamProcess(){
+  // Physical memory used by process
+  PROCESS_MEMORY_COUNTERS_EX pmc;
+  GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc));
+  SIZE_T physMemUsedProcess = pmc.WorkingSetSize;
+
+  return (double)physMemUsedProcess;
+}
+#endif
+
+using json = nlohmann::json;
 using namespace httplib;
 
 const auto SERVER_NAME =
     std::format("cpp-httplib-server/{}", CPPHTTPLIB_VERSION);
 
 Server svr;
+
+// Forward declarations for platform-specific metrics functions
+int getCpuUsagePercent();
+int getRamUsagePercent();
 
 void signal_handler(int signal) {
   if (signal == SIGINT || signal == SIGTERM) {
@@ -242,18 +395,68 @@ bool setup_server(Server &svr, const ServerConfig &config) {
   svr.set_file_extension_and_mimetype_mapping("zip", "application/zip");
   svr.set_file_extension_and_mimetype_mapping("txt", "text/plain");
 
-  // Add a simple metrics endpoint with CORS support for the frontend
+  // Metrics endpoint with CORS support for the frontend
   svr.Options("/metrics", [](const Request&, Response &res) {
-    res.set_header("Access-Control-Allow-Origin", "*");
+    res.set_header("Access-Control-Allow-Origin", "http://localhost");
     res.set_header("Access-Control-Allow-Methods", "GET, OPTIONS");
     res.set_header("Access-Control-Allow-Headers", "Content-Type");
     res.status = 204;
   });
 
-  svr.Get("/metrics", [](const Request&, Response &res) {
-    res.set_header("Access-Control-Allow-Origin", "*");
-    res.set_content("{\"cpu\":55,\"ram\":73}", "application/json");
+
+
+  // getRAMValue();
+
+  svr.Get("/metrics", [](const Request&, Response& res) {
+    json data = {
+      // {"cpu", getCPUValue()},
+      // {"cpu current", getCurrentCPUValue()},
+      // {"ram", totalVirtualMem == 0 ? 0 : (double)virtualMemUsed * 100 / totalVirtualMem},
+      // {"ram process", totalVirtualMem == 0 ? 0 : (double)virtualMemUsedProcess * 100 / totalVirtualMem},
+      // {"phys ram", totalPhysMem == 0 ? 0 : (double)physMemUsed * 100 / totalPhysMem},
+      // {"phys ram process", totalPhysMem == 0 ? 0 : (double)physMemUsedProcess * 100 / totalPhysMem}
+      {"cpu", getCpuUsagePercent()},
+      {"ram", getRamUsagePercent()}
+    };
+
+    res.set_header("Access-Control-Allow-Origin", "http://localhost");
+    res.set_content(data.dump(), "application/json");
   });
+
+  // SSE: stream metrics continuously every 500ms
+  svr.Get("/metrics/stream", [](const Request& /*req*/, Response &res) {
+    res.set_header("Content-Type", "text/event-stream");
+    res.set_header("Cache-Control", "no-cache");
+    res.set_header("Connection", "keep-alive");
+    res.set_header("Access-Control-Allow-Origin", "http://localhost");
+
+    res.set_chunked_content_provider("text/event-stream",
+      [](size_t /*offset*/, httplib::DataSink &sink) {
+        // send one SSE event per call, sleep for 500ms then allow continuing
+        json data = {
+          {"cpu", getCpuUsagePercent()},
+          {"ram", getRamUsagePercent()}
+          // {"cpu", getCPUValue()},
+          // {"cpu current", getCurrentCPUValue()},
+          // {"ram", getVirtualRam()},
+          // {"ram used", getUsedVirtualRam()},
+          // {"ram process", getVirtualRamProcess()},
+          // {"phys ram", getPhysicalRam()},
+          // {"phys ram used", getUsedPhysicalRam()},
+          // {"phys ram process", getPhysicalRamProcess()}
+        };
+        std::string s = "data: " + data.dump() + "\n\n";
+        sink.write(s.data(), s.size());
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        // return true to indicate we'll send more data later
+        return true;
+      });
+  });
+
+
+
+
+
   svr.set_error_handler([](const Request & /*req*/, Response &res) {
     if (res.status == 404) {
       res.set_content(
@@ -277,6 +480,97 @@ bool setup_server(Server &svr, const ServerConfig &config) {
 
   return true;
 }
+
+
+#ifdef _WIN32
+
+struct CpuTimes {
+    ULONGLONG idle;
+    ULONGLONG total;
+};
+
+CpuTimes readCpuTimes() {
+    FILETIME idleTime, kernelTime, userTime;
+    GetSystemTimes(&idleTime, &kernelTime, &userTime);
+
+    ULONGLONG idle =
+        ((ULONGLONG)idleTime.dwHighDateTime << 32) | idleTime.dwLowDateTime;
+
+    ULONGLONG kernel =
+        ((ULONGLONG)kernelTime.dwHighDateTime << 32) | kernelTime.dwLowDateTime;
+
+    ULONGLONG user =
+        ((ULONGLONG)userTime.dwHighDateTime << 32) | userTime.dwLowDateTime;
+
+    return { idle, kernel + user };
+}
+
+int getCpuUsagePercent() {
+    auto t1 = readCpuTimes();
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    auto t2 = readCpuTimes();
+
+    ULONGLONG idle = t2.idle - t1.idle;
+    ULONGLONG total = t2.total - t1.total;
+
+    return (int)(100 * (total - idle) / total);
+}
+
+int getRamUsagePercent() {
+    MEMORYSTATUSEX memInfo;
+    memInfo.dwLength = sizeof(memInfo);
+    GlobalMemoryStatusEx(&memInfo);
+
+    DWORDLONG total = memInfo.ullTotalPhys;
+    DWORDLONG available = memInfo.ullAvailPhys;
+
+    return (int)((total - available) * 100 / total);
+}
+
+#else // POSIX / Linux
+
+struct CpuTimes {
+    unsigned long long idle;
+    unsigned long long total;
+};
+
+CpuTimes readCpuTimes() {
+    std::ifstream stat("/proc/stat");
+    std::string line;
+    std::getline(stat, line);
+    std::istringstream ss(line);
+    std::string cpu;
+    unsigned long long user = 0, nice = 0, system = 0, idle = 0, iowait = 0, irq = 0, softirq = 0, steal = 0;
+    ss >> cpu >> user >> nice >> system >> idle >> iowait >> irq >> softirq >> steal;
+    unsigned long long total = user + nice + system + idle + iowait + irq + softirq + steal;
+    return { idle, total };
+}
+
+int getCpuUsagePercent() {
+    auto t1 = readCpuTimes();
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    auto t2 = readCpuTimes();
+
+    unsigned long long idle = t2.idle - t1.idle;
+    unsigned long long total = t2.total - t1.total;
+
+    if (total == 0) return 0;
+    return (int)(100 * (total - idle) / total);
+}
+
+int getRamUsagePercent() {
+    struct sysinfo memInfo;
+    sysinfo(&memInfo);
+    unsigned long long total = memInfo.totalram;
+    unsigned long long free = memInfo.freeram + memInfo.bufferram;
+    unsigned long long used = (total > free) ? (total - free) : 0;
+    if (total == 0) return 0;
+    return (int)(used * 100 / total);
+}
+
+#endif
+
+
 
 int main(int argc, char *argv[]) {
   ServerConfig config;
