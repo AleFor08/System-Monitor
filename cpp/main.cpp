@@ -3,26 +3,48 @@
 
 using json = nlohmann::json;
 
-double getTotalVirtualMemory();
-double getUsedVirtualMemory();
+double getCPU();
+double getCPUProcess();
 double getTotalPhysicalMemory();
 double getUsedPhysicalMemory();
-double getCurrentCPU();
+double getProcessPhysicalMemory();
+double getTotalVirtualMemory();
+double getUsedVirtualMemory();
+double getProcessVirtualMemory();
 
 #ifdef _WIN32
 
 #include "windows.h"
 #include "TCHAR.h"
 #include "pdh.h"
+#include "psapi.h"
 
 
 static PDH_HQUERY cpuQuery;
 static PDH_HCOUNTER cpuTotal;
 
+static ULARGE_INTEGER lastCPU, lastSysCPU, lastUserCPU;
+static int numProcessors;
+static HANDLE self;
+
 void init(){
     PdhOpenQuery(NULL, NULL, &cpuQuery);
     PdhAddEnglishCounter(cpuQuery, L"\\Processor(_Total)\\% Processor Time", NULL, &cpuTotal);
     PdhCollectQueryData(cpuQuery);
+
+    SYSTEM_INFO sysInfo;
+    FILETIME ftime, fsys, fuser;
+
+    GetSystemInfo(&sysInfo);
+    numProcessors = sysInfo.dwNumberOfProcessors;
+
+    GetSystemTimeAsFileTime(&ftime);
+    memcpy(&lastCPU, &ftime, sizeof(FILETIME));
+
+    self = GetCurrentProcess();
+    GetProcessTimes(self, &ftime, &ftime, &fsys, &fuser);
+    memcpy(&lastSysCPU, &fsys, sizeof(FILETIME));
+    memcpy(&lastUserCPU, &fuser, sizeof(FILETIME));
 }
 
 
@@ -40,6 +62,13 @@ double getUsedVirtualMemory() {
     return (double)virtualMemUsed;
 }
 
+double getProcessVirtualMemory() {
+    PROCESS_MEMORY_COUNTERS_EX pmc;
+    GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc));
+    SIZE_T virtualMemUsedByMe = pmc.PrivateUsage;
+    return (double)virtualMemUsedByMe;
+}
+
 double getTotalPhysicalMemory() {
     DWORDLONG totalPhysMem = memInfo.ullTotalPhys;
     return (double)totalPhysMem;
@@ -50,13 +79,42 @@ double getUsedPhysicalMemory() {
     return (double)physMemUsed;
 }
 
+double getProcessVirtualMemory() {
+    PROCESS_MEMORY_COUNTERS_EX pmc;
+    GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc));
+    SIZE_T physMemUsedByMe = pmc.WorkingSetSize;
+    return (double)physMemUsedByMe;
+}
 
-double getCurrentCPU(){
+
+double getCPU(){
     PDH_FMT_COUNTERVALUE counterVal;
 
     PdhCollectQueryData(cpuQuery);
     PdhGetFormattedCounterValue(cpuTotal, PDH_FMT_DOUBLE, NULL, &counterVal);
-    /return counterVal.doubleValue;
+    return counterVal.doubleValue;
+}
+
+double getCPUProcess() {
+    FILETIME ftime, fsys, fuser;
+    ULARGE_INTEGER now, sys, user;
+    double percent;
+
+    GetSystemTimeAsFileTime(&ftime);
+    memcpy(&now, &ftime, sizeof(FILETIME));
+
+    GetProcessTimes(self, &ftime, &ftime, &fsys, &fuser);
+    memcpy(&sys, &fsys, sizeof(FILETIME));
+    memcpy(&user, &fuser, sizeof(FILETIME));
+    percent = (sys.QuadPart - lastSysCPU.QuadPart) +
+        (user.QuadPart - lastUserCPU.QuadPart);
+    percent /= (now.QuadPart - lastCPU.QuadPart);
+    percent /= numProcessors;
+    lastCPU = now;
+    lastUserCPU = user;
+    lastSysCPU = sys;
+
+    return percent * 100;
 }
 
 
@@ -69,24 +127,53 @@ double getCurrentCPU(){
 #include "stdio.h"
 #include "string.h"
 
+#include "sys/times.h"
+
 struct sysinfo memInfo;
 static unsigned long long lastTotalUser, lastTotalUserLow, lastTotalSys, lastTotalIdle;
 
+static clock_t lastCPU, lastSysCPU, lastUserCPU;
+static int numProcessors;
+
+int parseLine(char* line){
+    // This assumes that a digit will be found and the line ends in " Kb".
+    int i = strlen(line);
+    const char* p = line;
+    while (*p <'0' || *p > '9') p++;
+    line[i-3] = '\0';
+    i = atoi(p);
+    return i;
+}
 
 void init() {
-    FILE* file = fopen("/proc/stat", "r");
-    if (!file) return;
+    FILE* file1 = fopen("/proc/stat", "r");
+    if (!file1) return;
 
-    if (fscanf(file, "cpu %llu %llu %llu %llu",
+    if (fscanf(file1, "cpu %llu %llu %llu %llu",
                &lastTotalUser,
                &lastTotalUserLow,
                &lastTotalSys,
                &lastTotalIdle) != 4) {
-        fclose(file);
+        fclose(file1);
         return;
     }
 
-    fclose(file);
+    fclose(file1);
+
+    FILE* file2;
+    struct tms timeSample;
+    char line[128];
+
+    lastCPU = times(&timeSample);
+    lastSysCPU = timeSample.tms_stime;
+    lastUserCPU = timeSample.tms_utime;
+
+    file2 = fopen("/proc/cpuinfo", "r");
+    numProcessors = 0;
+    while(fgets(line, 128, file2) != NULL){
+        if (strncmp(line, "processor", 9) == 0) numProcessors++;
+    }
+    fclose(file2);
 }
 
 double getTotalVirtualMemory() {
@@ -109,6 +196,21 @@ double getUsedVirtualMemory() {
     return (double)virtualMemUsed;
 }
 
+double getProcessVirtualMemory(){ //Note: this value is in KB!
+    FILE* file = fopen("/proc/self/status", "r");
+    int result = -1;
+    char line[128];
+
+    while (fgets(line, 128, file) != NULL){
+        if (strncmp(line, "VmSize:", 7) == 0){
+            result = parseLine(line);
+            break;
+        }
+    }
+    fclose(file);
+    return (double)result;  
+}
+
 double getTotalPhysicalMemory() {
     sysinfo (&memInfo);
     long long totalPhysMem = memInfo.totalram;
@@ -127,7 +229,22 @@ double getUsedPhysicalMemory() {
     return (double)physMemUsed;
 }
 
-double getCurrentCPU() {
+double getProcessPhysicalMemory(){ //Note: this value is in KB!
+    FILE* file = fopen("/proc/self/status", "r");
+    double result = -1;
+    char line[128];
+
+    while (fgets(line, 128, file) != NULL){
+        if (strncmp(line, "VmRSS:", 6) == 0){
+            result = parseLine(line);
+            break;
+        }
+    }
+    fclose(file);
+    return (double)result;  
+}
+
+double getCPU() {
     FILE* file = fopen("/proc/stat", "r");
     if (!file) return -1.0;
 
@@ -170,59 +287,68 @@ double getCurrentCPU() {
     return percent;
 }
 
+double getCPUProcess(){
+    struct tms timeSample;
+    clock_t now;
+    double percent;
+
+    now = times(&timeSample);
+    if (now <= lastCPU || timeSample.tms_stime < lastSysCPU ||
+        timeSample.tms_utime < lastUserCPU){
+        //Overflow detection. Just skip this value.
+        percent = -1.0;
+    }
+    else{
+        percent = (timeSample.tms_stime - lastSysCPU) +
+            (timeSample.tms_utime - lastUserCPU);
+        percent /= (now - lastCPU);
+        percent /= numProcessors;
+        percent *= 100;
+    }
+    lastCPU = now;
+    lastSysCPU = timeSample.tms_stime;
+    lastUserCPU = timeSample.tms_utime;
+
+    return percent;
+}
+
 #endif
 
-// double i1 = 0.0;
-// double i2 = 0.0;
 
-// double cpu_usage() {
-//     if (i1 > 100.0) {
-//         i1 = 0.0;
-//     }
-//     i1 += 0.1;
-//     return i1;
-// }
-
-// double ram_usage() {
-//     if (i2 > 100.0) {
-//         i2 = 0.0;
-//     }
-//     i2 += 0.1;
-//     return i2;
-// }
-
-
-
+// Server setup
 int main() {
     httplib::Server server;
 
     server.Get("/metrics/stream", [](const httplib::Request&, httplib::Response& res) {
-    res.set_header("Content-Type", "text/event-stream");
-    res.set_header("Cache-Control", "no-cache");
-    res.set_header("Connection", "keep-alive");
-    res.set_header("Access-Control-Allow-Origin", "http://localhost");
+        res.set_header("Content-Type", "text/event-stream");
+        res.set_header("Cache-Control", "no-cache");
+        res.set_header("Connection", "keep-alive");
+        res.set_header("Access-Control-Allow-Origin", "http://localhost");
 
-    res.set_chunked_content_provider(
-        "text/event-stream",
-        [](size_t, httplib::DataSink& sink) {
-            json data = {
-                {"status", "connected"},
-                {"cpu", getCurrentCPU()},
-                {"total_ram", getTotalPhysicalMemory()},
-                {"used_ram", getUsedPhysicalMemory()},
-                {"total_virtual_ram", getTotalVirtualMemory()},
-                {"used_virtual_ram", getUsedVirtualMemory()}
-            };
+        res.set_chunked_content_provider(
+            "text/event-stream",
+            [](size_t, httplib::DataSink& sink) {
+                json data = {
+                    {"status", "connected"},
+                    {"cpu", getCPU()},
+                    {"cpu_process", getCPUProcess()},
+                    {"total_ram", getTotalPhysicalMemory()},
+                    {"used_ram", getUsedPhysicalMemory()},
+                    {"process_ram", getProcessPhysicalMemory()},
+                    {"total_virtual_ram", getTotalVirtualMemory()},
+                    {"used_virtual_ram", getUsedVirtualMemory()},
+                    {"process_virtual_ram", getProcessVirtualMemory()}
+                };
 
-            std::string msg = "data: " + data.dump() + "\n\n";
-            sink.write(msg.data(), msg.size());
+                std::string msg = "data: " + data.dump() + "\n\n";
+                sink.write(msg.data(), msg.size());
 
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-            return true;
-        }
-    );
-});
+                return true;
+            }
+        );
+    });
 
 
     server.listen("0.0.0.0", 80);

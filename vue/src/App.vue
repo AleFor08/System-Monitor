@@ -4,10 +4,13 @@
     const metrics = ref({
         status: 'disconnected',
         cpu: 0,
+        cpu_process: 0,
         total_ram: 0,
         used_ram: 0,
+        process_physical_ram: 0,
         total_virtual_ram: 0,
-        used_virtual_ram: 0
+        used_virtual_ram: 0,
+        process_virtual_ram: 0
     })
 
     const error = ref('')
