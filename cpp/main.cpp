@@ -35,6 +35,7 @@ int main() {
         "text/event-stream",
         [](size_t, httplib::DataSink& sink) {
             json data = {
+                {"status", "connected"},
                 {"cpu", cpu_usage()},
                 {"ram", ram_usage()}
             };
