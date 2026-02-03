@@ -2,9 +2,12 @@
     import { ref, onMounted, onUnmounted, computed } from 'vue'
 
     const metrics = ref({
+        status: 'disconnected',
         cpu: 0,
-        ram: 0,
-        status: 'AKTIV'
+        total_ram: 0,
+        used_ram: 0,
+        total_virtual_ram: 0,
+        used_virtual_ram: 0
     })
 
     const error = ref('')
@@ -32,7 +35,7 @@
 
     const isActive = computed(() => {
         const s = String(metrics.value.status ?? '').toLowerCase()
-        return s === 'aktiv' || s === 'online' || s === 'up' || s === 'true'
+        return s === 'connected' || s === 'online' || s === 'up' || s === 'true'
     })
 </script>
 
