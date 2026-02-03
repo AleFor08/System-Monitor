@@ -71,9 +71,9 @@
                 <div class="card h-100 shadow-sm border-0">
                     <div class="card-body text-center">
                         <h5 class="card-title text-muted">RAM Bruk</h5>
-                        <h2 class="display-4 fw-bold">{{ metrics.ram }}%</h2>
+                        <h2 class="display-4 fw-bold">{{ metrics.total_ram }}%</h2>
                         <div class="progress mt-3">
-                            <div class="progress-bar bg-info" :style="{ width: metrics.ram + '%' }"></div>
+                            <div class="progress-bar bg-info" :style="{ width: metrics.total_ram + '%' }"></div>
                         </div>
                     </div>
                 </div>
