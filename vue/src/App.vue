@@ -1,29 +1,34 @@
 <script setup lang="ts">
-    import { ref, onMounted, computed } from 'vue'
+    import { ref, onMounted, onUnmounted, computed } from 'vue'
 
     const metrics = ref({
         cpu: 0,
         ram: 0,
-        status: 'Aktiv' // Endret til tekst for enkelhets skyld i demoen
+        status: 'AKTIV'
     })
 
     const error = ref('')
 
-    const fetchMetrics = async () => {
-        try {
-            const res = await fetch('http://localhost:8080/metrics')
-            if (!res.ok) throw new Error(`HTTP ${res.status}`)
-            const data = await res.json()
-            metrics.value = data
-            error.value = ''
-        } catch (err) {
-            console.error(err)
-            error.value = 'Kunne ikke hente systemdata fra serveren.'
-        }
-    }
+    onMounted(() => {
+        const es = new EventSource('http://localhost:8080/metrics/stream');
+        es.onmessage = (ev) => {
+            try {
+                metrics.value = JSON.parse(ev.data);
+                console.log("Update");
+                error.value = '';
+            } catch (e) {
+                error.value = 'Feil ved parsing av metrics: ' + e;
+            }
+    };
+    es.onerror = (err) => {
+        error.value = 'SSE-feil: ' + err;
+        es.close();
+    };
 
-    onMounted(fetchMetrics)
-    const refresh = fetchMetrics
+    onUnmounted(() => {
+        es.close();
+    });
+    });
 
     const isActive = computed(() => {
         const s = String(metrics.value.status ?? '').toLowerCase()
