@@ -136,7 +136,6 @@ static clock_t lastCPU, lastSysCPU, lastUserCPU;
 static int numProcessors;
 
 int parseLine(char* line){
-    // This assumes that a digit will be found and the line ends in " Kb".
     int i = strlen(line);
     const char* p = line;
     while (*p <'0' || *p > '9') p++;
@@ -179,7 +178,6 @@ void init() {
 double getTotalVirtualMemory() {
     sysinfo (&memInfo);
     long long totalVirtualMem = memInfo.totalram;
-    //Add other values in next statement to avoid int overflow on right hand side...
     totalVirtualMem += memInfo.totalswap;
     totalVirtualMem *= memInfo.mem_unit;
 
@@ -189,14 +187,13 @@ double getTotalVirtualMemory() {
 double getUsedVirtualMemory() {
     sysinfo (&memInfo);
     long long virtualMemUsed = memInfo.totalram - memInfo.freeram;
-    //Add other values in next statement to avoid int overflow on right hand side...
     virtualMemUsed += memInfo.totalswap - memInfo.freeswap;
     virtualMemUsed *= memInfo.mem_unit;
 
     return (double)virtualMemUsed;
 }
 
-double getProcessVirtualMemory(){ //Note: this value is in KB!
+double getProcessVirtualMemory(){
     FILE* file = fopen("/proc/self/status", "r");
     int result = -1;
     char line[128];
@@ -214,7 +211,6 @@ double getProcessVirtualMemory(){ //Note: this value is in KB!
 double getTotalPhysicalMemory() {
     sysinfo (&memInfo);
     long long totalPhysMem = memInfo.totalram;
-    //Multiply in next statement to avoid int overflow on right hand side...
     totalPhysMem *= memInfo.mem_unit;
 
     return (double)totalPhysMem;
@@ -223,13 +219,12 @@ double getTotalPhysicalMemory() {
 double getUsedPhysicalMemory() {
     sysinfo (&memInfo);
     long long physMemUsed = memInfo.totalram - memInfo.freeram;
-    //Multiply in next statement to avoid int overflow on right hand side...
     physMemUsed *= memInfo.mem_unit;
 
     return (double)physMemUsed;
 }
 
-double getProcessPhysicalMemory(){ //Note: this value is in KB!
+double getProcessPhysicalMemory(){
     FILE* file = fopen("/proc/self/status", "r");
     double result = -1;
     char line[128];
@@ -284,33 +279,89 @@ double getCPU() {
     lastTotalSys = totalSys;
     lastTotalIdle = totalIdle;
 
-    return percent;
+    return (double)percent;
 }
+int i = 1;
+double getCPUProcess() {
+    // std::cout << "Start getCPUProcess" << std::endl; // Comment
+    // struct tms timeSample;
+    // std::cout << "timeSample stime:" << timeSample.tms_stime << std::endl; // Comment
+    // std::cout << "timeSample utime:" << timeSample.tms_utime << std::endl; // Comment
+    // clock_t now = times(&timeSample);
+    // std::cout << "now:" << now << std::endl; // Comment
+   
 
-double getCPUProcess(){
+    // if (now == (clock_t)-1) {
+    //     return -1.0;
+    //     std::cout << "Return -1.0 (1):" << std::endl; // Comment
+    // }
+
+    // if (lastCPU == 0) {
+    //     lastCPU = now;
+    //     lastSysCPU = timeSample.tms_stime;
+    //     lastUserCPU = timeSample.tms_utime;
+    //     return 0.0;
+    //     std::cout << "Return 0.0 (1):" << std::endl; // Comment
+    // }
+    // std::cout << "lastCPU: " << lastCPU << std::endl; // Comment
+    
+   
+
+    // double percent =
+    //     (timeSample.tms_stime - lastSysCPU) +
+    //     (timeSample.tms_utime - lastUserCPU);
+    // std::cout << "Percent: (1)" << percent << std::endl; // Comment
+    // percent /= (now - lastCPU);
+    // std::cout << "Percent: (2)" << percent << std::endl; // Comment
+    // percent /= numProcessors;
+    // std::cout << "Percent: (3)" << percent << std::endl; // Comment
+    // percent *= 100.0;
+    // std::cout << "Percent: (4)" << percent << std::endl; // Comment
+
+    // lastCPU = now;
+    // lastSysCPU = timeSample.tms_stime;
+    // lastUserCPU = timeSample.tms_utime;
+    // std::cout << "Percent: (5)" << percent << std::endl; // Comment
+    // return percent;
+
+    std::cout << "----------------------------" << std::endl; // Comment
+    std::cout << "Update: " << i << std::endl; // Comment
+    i++;
+    std::cout << "----------------------------" << std::endl; // Comment
+    std::cout << "Start getCPUProcess" << std::endl; // Comment
     struct tms timeSample;
+    std::cout << "timeSample stime: " << timeSample.tms_stime << std::endl; // Comment
+    std::cout << "timeSample utime: " << timeSample.tms_utime << std::endl; // Comment
     clock_t now;
+    std::cout << "Now: " << now << std::endl; // Comment
     double percent;
+
 
     now = times(&timeSample);
     if (now <= lastCPU || timeSample.tms_stime < lastSysCPU ||
         timeSample.tms_utime < lastUserCPU){
         //Overflow detection. Just skip this value.
         percent = -1.0;
+        std::cout << "Return -1.0 (1):" << std::endl; // Comment
     }
     else{
         percent = (timeSample.tms_stime - lastSysCPU) +
             (timeSample.tms_utime - lastUserCPU);
+            std::cout << "Percent: (1): " << percent << std::endl; // Comment
         percent /= (now - lastCPU);
+        std::cout << "Percent (2): " << percent << std::endl; // Comment
         percent /= numProcessors;
+        std::cout << "Percent (3): " << percent << std::endl; // Comment
         percent *= 100;
+        std::cout << "Percent (4): " << percent << std::endl; // Comment
     }
     lastCPU = now;
     lastSysCPU = timeSample.tms_stime;
     lastUserCPU = timeSample.tms_utime;
-
+    std::cout << "Percent (5): " << percent << std::endl; // Comment
     return percent;
 }
+
 
 #endif
 
