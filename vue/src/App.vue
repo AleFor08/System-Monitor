@@ -3,14 +3,14 @@
 
     const metrics = ref({
         status: 'disconnected',
-        cpu: 0,
-        cpu_process: 0,
-        total_ram: 0,
-        used_ram: 0,
-        process_physical_ram: 0,
-        total_virtual_ram: 0,
-        used_virtual_ram: 0,
-        process_virtual_ram: 0
+        cpu: 0, // %
+        cpu_process: 0, // %
+        total_ram: 0, // KB -
+        used_ram: 0, // KB -
+        process_physical_ram: 0, // % -
+        total_virtual_ram: 0, // KB -
+        used_virtual_ram: 0, // KB -
+        process_virtual_ram: 0 // %
     })
 
     const error = ref('')
@@ -70,15 +70,83 @@
             <div class="col-md-4">
                 <div class="card h-100 shadow-sm border-0">
                     <div class="card-body text-center">
-                        <h5 class="card-title text-muted">RAM Bruk</h5>
-                        <h2 class="display-4 fw-bold">{{ metrics.total_ram }}%</h2>
+                        <h5 class="card-title text-muted">Total RAM</h5>
+                        <h2 class="display-4 fw-bold">{{ metrics.total_ram }} KB</h2>
                         <div class="progress mt-3">
                             <div class="progress-bar bg-info" :style="{ width: metrics.total_ram + '%' }"></div>
                         </div>
                     </div>
                 </div>
             </div>
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body text-center">
+                        <h5 class="card-title text-muted">Used RAM</h5>
+                        <h2 class="display-4 fw-bold">{{ metrics.used_ram }} KB</h2>
+                        <div class="progress mt-3">
+                            <div class="progress-bar bg-info" :style="{ width: metrics.used_ram + '%' }"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body text-center">
+                        <h5 class="card-title text-muted">Physical RAM</h5>
+                        <h2 class="display-4 fw-bold">{{ metrics.process_physical_ram }} %</h2>
+                        <div class="progress mt-3">
+                            <div class="progress-bar bg-info" :style="{ width: metrics.process_physical_ram + '%' }"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+             <div class="col-md-4">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body text-center">
+                        <h5 class="card-title text-muted">Total Virtual RAM</h5>
+                        <h2 class="display-4 fw-bold">{{ metrics.total_virtual_ram }} KB</h2>
+                        <div class="progress mt-3">
+                            <div class="progress-bar bg-info" :style="{ width: metrics.total_virtual_ram + '%' }"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body text-center">
+                        <h5 class="card-title text-muted">Used Virtual RAM</h5>
+                        <h2 class="display-4 fw-bold">{{ metrics.used_virtual_ram }} KB</h2>
+                        <div class="progress mt-3">
+                            <div class="progress-bar bg-info" :style="{ width: metrics.used_virtual_ram + '%' }"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body text-center">
+                        <h5 class="card-title text-muted">Process Virtual RAM</h5>
+                        <h2 class="display-4 fw-bold">{{ metrics.process_virtual_ram }} %</h2>
+                        <div class="progress mt-3">
+                            <div class="progress-bar bg-info" :style="{ width: metrics.process_virtual_ram + '%' }"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+             <div class="col-md-4">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body text-center">
+                        <h5 class="card-title text-muted">Used Virtual RAM</h5>
+                        <h2 class="display-4 fw-bold">{{ Math.round((metrics.used_virtual_ram / metrics.total_virtual_ram * 100)) }} %</h2>
+                        <div class="progress mt-3">
+                            <div class="progress-bar bg-info" :style="{ width: Math.round((metrics.used_virtual_ram / metrics.total_virtual_ram * 100)) + '%' }"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!--This is where it goes-->
 
+            <!-- her skal du pytte ein ny tile som viser prosent regnt ut i %: {{ Math.round((metrics.used_ram / metrics.total_ram * 100)) }} -->
             <div class="col-md-4">
                 <div class="card h-100 shadow-sm border-0 bg-dark text-white text-center">
                     <div class="card-body d-flex flex-column justify-content-center">
@@ -93,13 +161,7 @@
                     </div>
                 </div>
             </div>
-
-        </div>
-
-        <div class="mt-5 border-top pt-4">
-            <button class="btn btn-outline-primary shadow-sm" @click="refresh">
-                Oppdater manuelt
-            </button>
+            
         </div>
     </div>
 </template>
