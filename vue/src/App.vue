@@ -12,7 +12,7 @@
         used_virtual_ram: 0, // KB -
         process_virtual_ram: 0 // %
     })
-
+        //Freamføring??
     const error = ref('')
 
     onMounted(() => {
@@ -33,6 +33,7 @@
 
     onUnmounted(() => {
         es.close();
+        //Fremføring??
     });
     });
 
