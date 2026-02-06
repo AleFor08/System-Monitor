@@ -40,6 +40,14 @@
         const s = String(metrics.value.status ?? '').toLowerCase()
         return s === 'connected' || s === 'online' || s === 'up' || s === 'true'
     })
+
+    function pct(value: unknown, total: unknown) {
+        const v = Number(value) || 0
+        const t = Number(total) || 0
+        if (!isFinite(v) || !isFinite(t) || t <= 0) return 0
+        const p = Math.round((v / t) * 100)
+        return Math.min(100, Math.max(0, p))
+    }
 </script>
 
 <template>
@@ -73,7 +81,7 @@
                         <h5 class="card-title text-muted">Total RAM</h5>
                         <h2 class="display-4 fw-bold">{{ metrics.total_ram }} KB</h2>
                         <div class="progress mt-3">
-                            <div class="progress-bar bg-info" :style="{ width: metrics.total_ram + '%' }"></div>
+                            <div class="progress-bar bg-info" :style="{ width: '100%' }"></div>
                         </div>
                     </div>
                 </div>
@@ -84,7 +92,7 @@
                         <h5 class="card-title text-muted">Used RAM</h5>
                         <h2 class="display-4 fw-bold">{{ metrics.used_ram }} KB</h2>
                         <div class="progress mt-3">
-                            <div class="progress-bar bg-info" :style="{ width: metrics.used_ram + '%' }"></div>
+                            <div class="progress-bar bg-info" :style="{ width: pct(metrics.used_ram, metrics.total_ram) + '%' }"></div>
                         </div>
                     </div>
                 </div>
@@ -100,13 +108,14 @@
                     </div>
                 </div>
             </div>
-             <div class="col-md-4">
-                <div class="card h-100 shadow-sm border-0">
+             <div class="col-md-4"> <!--Deler siden inn i kolonner-->
+                <div class="card h-100 shadow-sm border-0"> <!--Lager selve "kortet" med en moderne skygge-->
                     <div class="card-body text-center">
                         <h5 class="card-title text-muted">Total Virtual RAM</h5>
-                        <h2 class="display-4 fw-bold">{{ metrics.total_virtual_ram }} KB</h2>
+                        <h2 class="display-4 fw-bold">{{ metrics.total_virtual_ram }} KB</h2> <!--De henter data direkte fra 
+                                                                                              JavaScript-objektet ditt og skriver dem ut-->
                         <div class="progress mt-3">
-                            <div class="progress-bar bg-info" :style="{ width: metrics.total_virtual_ram + '%' }"></div>
+                            <div class="progress-bar bg-info" :style="{ width: '100%' }"></div>
                         </div>
                     </div>
                 </div>
@@ -117,7 +126,7 @@
                         <h5 class="card-title text-muted">Used Virtual RAM</h5>
                         <h2 class="display-4 fw-bold">{{ metrics.used_virtual_ram }} KB</h2>
                         <div class="progress mt-3">
-                            <div class="progress-bar bg-info" :style="{ width: metrics.used_virtual_ram + '%' }"></div>
+                            <div class="progress-bar bg-info" :style="{ width: pct(metrics.used_virtual_ram, metrics.total_virtual_ram) + '%' }"></div>
                         </div>
                     </div>
                 </div>
@@ -136,7 +145,7 @@
              <div class="col-md-4">
                 <div class="card h-100 shadow-sm border-0">
                     <div class="card-body text-center">
-                        <h5 class="card-title text-muted">Used Virtual RAM</h5>
+                        <h5 class="card-title text-muted">Used and Total Virtual RAM</h5>
                         <h2 class="display-4 fw-bold">{{ Math.round((metrics.used_virtual_ram / metrics.total_virtual_ram * 100)) }} %</h2>
                         <div class="progress mt-3">
                             <div class="progress-bar bg-info" :style="{ width: Math.round((metrics.used_virtual_ram / metrics.total_virtual_ram * 100)) + '%' }"></div>
@@ -144,8 +153,6 @@
                     </div>
                 </div>
             </div>
-            <!--This is where it goes-->
-
             <!-- her skal du pytte ein ny tile som viser prosent regnt ut i %: {{ Math.round((metrics.used_ram / metrics.total_ram * 100)) }} -->
             <div class="col-md-4">
                 <div class="card h-100 shadow-sm border-0 bg-dark text-white text-center">
